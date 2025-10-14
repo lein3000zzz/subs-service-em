@@ -2,14 +2,18 @@
 This project is a REST API service for managing user subscriptions with auto-generating swagger docs, built with Go, Gin, GORM, [gin-swagger](https://github.com/swaggo/gin-swagger) and PostgreSQL.
 
 ### Requirements
-`Go 1.25 or later`\
-`PostgreSQL`\
-`Docker`\
+```
+Go 1.25 or later
+PostgreSQL
+Docker
+```
 
 ### Installation
-`git clone <https://github.com/lein3000zzz/subs-service-em>`\
-`cd subs-service-em`\
-`go mod download`
+```
+git clone <https://github.com/lein3000zzz/subs-service-em>
+cd subs-service-em
+go mod download
+```
 ### Running without docker
 1. Set up a PostgreSQL database.
 2. Fill `local.env` with your own data
