@@ -1,5 +1,5 @@
 CREATE TABLE IF NOT EXISTS subscriptions (
-    id BIGSERIAL PRIMARY KEY,
+    id CHAR(40) PRIMARY KEY,
     service VARCHAR(255) NOT NULL,
     cost INTEGER NOT NULL CHECK (cost >= 0),
     user_id UUID NOT NULL,

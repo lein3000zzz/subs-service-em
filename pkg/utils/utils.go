@@ -1,11 +1,22 @@
 package utils
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
 )
+
+func GenerateID() (string, error) {
+	bytes := make([]byte, 20)
+	_, err := rand.Read(bytes)
+	if err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(bytes), nil
+}
 
 func GetPageAndLimitFromContext(c *gin.Context) (int, int) {
 	page := 1

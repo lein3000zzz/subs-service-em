@@ -14,7 +14,7 @@ const (
 )
 
 type Subscription struct {
-	ID        *int64     `gorm:"primaryKey;autoIncrement;type:bigint"`
+	ID        string     `gorm:"primaryKey;type:char(40)"`
 	Service   string     `gorm:"type:varchar(255);uniqueIndex:index_subs"`
 	Cost      int32      `gorm:"type:int;not null"`
 	UserID    uuid.UUID  `gorm:"type:uuid;uniqueIndex:index_subs"`
@@ -40,11 +40,11 @@ type SubscriptionsData struct {
 }
 
 type SubscriptionsRepo interface {
-	Create(subscription *Subscription) (int64, error)
+	Create(subscription *Subscription) (string, error)
 	ReadByParams(filter *SubscriptionFilter) (*Subscription, error)
-	ReadByID(id int64) (*Subscription, error)
-	Update(id int64, subscriptionUpdated *Subscription) error
-	DeleteByID(id int64) error
+	ReadByID(id string) (*Subscription, error)
+	Update(id string, subscriptionUpdated *Subscription) error
+	DeleteByID(id string) error
 	List(filter *SubscriptionFilter) (*SubscriptionsData, error)
 	GetTotalCost(filter *SubscriptionFilter) (int64, error)
 }

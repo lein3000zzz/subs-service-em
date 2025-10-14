@@ -22,8 +22,16 @@ func NewSubscriptionsPgRepo(logger *zap.SugaredLogger, db *gorm.DB) *Subscriptio
 	}
 }
 
-func (repo *SubscriptionsPgRepo) Create(subscription *Subscription) (int64, error) {
+func (repo *SubscriptionsPgRepo) Create(subscription *Subscription) (string, error) {
 	repo.logger.Debugw("create subscription", "subscription", subscription)
+
+	id, err := utils.GenerateID()
+	if err != nil {
+		repo.logger.Errorw("error generating id", "err", err)
+		return "", err
+	}
+
+	subscription.ID = id
 
 	ctx, cancel := context.WithTimeout(context.Background(), SLATimeout)
 	defer cancel()
@@ -32,16 +40,16 @@ func (repo *SubscriptionsPgRepo) Create(subscription *Subscription) (int64, erro
 
 	if upsertRes.Error != nil {
 		repo.logger.Errorw("error upserting subscription", "error", upsertRes.Error, "subscription", subscription)
-		return 0, upsertRes.Error
+		return "", upsertRes.Error
 	}
 
 	if upsertRes.RowsAffected != 1 {
 		repo.logger.Warnw("failed upserting subscription", "error", ErrAlreadyExists, "subscription", subscription)
-		return 0, ErrAlreadyExists
+		return "", ErrAlreadyExists
 	}
 
 	repo.logger.Infow("subscription created", "subscription", subscription)
-	return *subscription.ID, nil
+	return subscription.ID, nil
 }
 
 func (repo *SubscriptionsPgRepo) ReadByParams(filter *SubscriptionFilter) (*Subscription, error) {
@@ -72,7 +80,7 @@ func (repo *SubscriptionsPgRepo) ReadByParams(filter *SubscriptionFilter) (*Subs
 	return &subscription, nil
 }
 
-func (repo *SubscriptionsPgRepo) ReadByID(id int64) (*Subscription, error) {
+func (repo *SubscriptionsPgRepo) ReadByID(id string) (*Subscription, error) {
 	repo.logger.Debugw("read subscription by id", "id", id)
 
 	ctx, cancel := context.WithTimeout(context.Background(), SLATimeout)
@@ -93,7 +101,7 @@ func (repo *SubscriptionsPgRepo) ReadByID(id int64) (*Subscription, error) {
 	return &subscription, nil
 }
 
-func (repo *SubscriptionsPgRepo) Update(id int64, subscriptionUpdated *Subscription) error {
+func (repo *SubscriptionsPgRepo) Update(id string, subscriptionUpdated *Subscription) error {
 	repo.logger.Debugw("update subscription", "subscription", subscriptionUpdated)
 
 	ctx, cancel := context.WithTimeout(context.Background(), SLATimeout)
@@ -118,7 +126,7 @@ func (repo *SubscriptionsPgRepo) Update(id int64, subscriptionUpdated *Subscript
 	return nil
 }
 
-func (repo *SubscriptionsPgRepo) DeleteByID(id int64) error {
+func (repo *SubscriptionsPgRepo) DeleteByID(id string) error {
 	repo.logger.Debugw("delete subscription", "id", id)
 
 	ctx, cancel := context.WithTimeout(context.Background(), SLATimeout)

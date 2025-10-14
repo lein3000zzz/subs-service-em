@@ -10,7 +10,7 @@ Docker
 
 ### Installation
 ```
-git clone <https://github.com/lein3000zzz/subs-service-em>
+git clone https://github.com/lein3000zzz/subs-service-em
 cd subs-service-em
 go mod download
 ```

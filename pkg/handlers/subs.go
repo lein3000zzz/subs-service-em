@@ -53,7 +53,7 @@ type SubscriptionResponse struct {
 }
 type BasicResponse struct {
 	Message string `json:"message"`
-	ID      int64  `json:"id"`
+	ID      string `json:"id"`
 }
 
 type ListResponse struct {
@@ -98,7 +98,7 @@ func (h *SubsHandler) CreateSub(c *gin.Context) {
 		return
 	}
 
-	var lastInsertedID int64
+	var lastInsertedID string
 	if lastInsertedID, err = h.subsRepo.Create(newSub); err != nil {
 		h.logger.Errorw("Failed to create subscription", "error", err)
 
@@ -127,7 +127,7 @@ func (h *SubsHandler) CreateSub(c *gin.Context) {
 // @Summary Get subscription by ID
 // @Tags subscriptions
 // @Produce json
-// @Param id path int true "Subscription ID"
+// @Param id path string true "Subscription ID"
 // @Success 200 {object} SubscriptionResponse
 // @Failure 400 {object} ErrorResponse
 // @Failure 404 {object} ErrorResponse
@@ -137,17 +137,7 @@ func (h *SubsHandler) GetSubByID(c *gin.Context) {
 
 	h.logger.Debugw("handling GetSubByID()")
 
-	idStr := c.Param("id")
-
-	id, err := strconv.ParseInt(idStr, 10, 64)
-	if err != nil {
-		h.logger.Errorw("Failed to parse id", "error", err)
-
-		c.JSON(http.StatusBadRequest, ErrorResponse{
-			Error: ErrInvalidParam.Error(),
-		})
-		return
-	}
+	id := c.Param("id")
 
 	subscription, err := h.subsRepo.ReadByID(id)
 	h.handleGetSubscriptionResponse(c, subscription, err)
@@ -255,7 +245,7 @@ func (h *SubsHandler) handleGetSubscriptionResponse(c *gin.Context, subscription
 // @Tags subscriptions
 // @Accept json
 // @Produce json
-// @Param id path int true "Subscription ID"
+// @Param id path string true "Subscription ID"
 // @Param request body basicRequest true "Subscription payload"
 // @Success 200 {object} BasicResponse
 // @Failure 400 {object} ErrorResponse
@@ -267,16 +257,7 @@ func (h *SubsHandler) UpdateSub(c *gin.Context) {
 
 	var request basicRequest
 
-	idStr := c.Param("id")
-	id, err := strconv.ParseInt(idStr, 10, 64)
-	if err != nil {
-		h.logger.Errorw("Failed to parse id", "error", err)
-
-		c.JSON(http.StatusBadRequest, ErrorResponse{
-			Error: ErrInvalidParam.Error(),
-		})
-		return
-	}
+	id := c.Param("id")
 
 	if err := c.ShouldBindJSON(&request); err != nil {
 		h.logger.Errorw("Failed to bind JSON", "error", err)
@@ -348,7 +329,7 @@ func (h *SubsHandler) UpdateSub(c *gin.Context) {
 // @Summary Delete subscription
 // @Tags subscriptions
 // @Produce json
-// @Param id path int true "Subscription ID"
+// @Param id path string true "Subscription ID"
 // @Success 200 {object} BasicResponse
 // @Failure 400 {object} ErrorResponse
 // @Failure 404 {object} ErrorResponse
@@ -357,19 +338,9 @@ func (h *SubsHandler) UpdateSub(c *gin.Context) {
 func (h *SubsHandler) DeleteSub(c *gin.Context) {
 	h.logger.Debugw("handling DeleteSub()")
 
-	idStr := c.Param("id")
+	id := c.Param("id")
 
-	id, err := strconv.ParseInt(idStr, 10, 64)
-	if err != nil {
-		h.logger.Errorw("Failed to parse id", "error", err)
-
-		c.JSON(http.StatusBadRequest, ErrorResponse{
-			Error: ErrInvalidParam.Error(),
-		})
-		return
-	}
-
-	err = h.subsRepo.DeleteByID(id)
+	err := h.subsRepo.DeleteByID(id)
 	if err != nil {
 		h.logger.Errorw("Failed to delete subscription", "error", err)
 
