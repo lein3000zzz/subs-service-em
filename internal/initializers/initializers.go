@@ -44,7 +44,7 @@ func startPostgres() *gorm.DB {
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
 
 	if err != nil {
-		log.Fatalf("Error initializing zap logger: %v", err)
+		log.Fatalf("Error initializing postgres: %v", err)
 	}
 
 	return db
@@ -73,6 +73,10 @@ func initSubsRouter(handler *handlers.SubsHandler) *gin.Engine {
 }
 
 func gormAutoMigrate(db *gorm.DB) {
+	if os.Getenv("ENVIRONMENT") != "LOCAL" {
+		return
+	}
+
 	if errAuto := db.AutoMigrate(
 		&subs.Subscription{},
 	); errAuto != nil {

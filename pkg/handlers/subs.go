@@ -281,7 +281,6 @@ func (h *SubsHandler) UpdateSub(c *gin.Context) {
 	var endDate *time.Time
 	if request.EndDate != nil {
 		endDateVal, err := time.Parse(subs.TimeParseFormat, *request.EndDate)
-		endDate = &endDateVal
 		if err != nil {
 			h.logger.Errorw(ErrDateFormat.Error(), "error", err)
 
@@ -290,6 +289,7 @@ func (h *SubsHandler) UpdateSub(c *gin.Context) {
 			})
 			return
 		}
+		endDate = &endDateVal
 	}
 
 	updatedSub := subs.Subscription{
@@ -368,8 +368,8 @@ func (h *SubsHandler) DeleteSub(c *gin.Context) {
 // @Summary List subscriptions
 // @Tags subscriptions
 // @Produce json
-// @Param Page query int false "Page"
-// @Param Limit query int false "Limit"
+// @Param page query int false "Page"
+// @Param limit query int false "Limit"
 // @Param sort query string false "Sort (cost_asc\|cost_desc\|service_asc\|service_desc\|start_date)"
 // @Param service query string false "Service name"
 // @Param userID query string false "User UUID"
