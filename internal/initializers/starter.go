@@ -23,6 +23,8 @@ func RunSubsService() {
 	logger := zapLogger.Sugar()
 
 	db := startPostgres()
+	gormAutoMigrate(db)
+
 	subsRepo := subs.NewSubscriptionsPgRepo(logger, db)
 
 	subsHandler := handlers.NewSubsHandler(subsRepo, logger)
