@@ -9,23 +9,25 @@ import (
 
 const (
 	SLATimeout = 5 * time.Second
+
+	TimeParseFormat = "01-2006"
 )
 
 type Subscription struct {
-	ID        string     `gorm:"type:char(40);uniqueIndex;not null"`
-	Service   string     `gorm:"type:varchar(255);primaryKey"`
+	ID        *int64     `gorm:"primaryKey;autoIncrement;type:bigint"`
+	Service   string     `gorm:"type:varchar(255);uniqueIndex:index_subs"`
 	Cost      int32      `gorm:"type:int;not null"`
-	UserID    uuid.UUID  `gorm:"type:uuid;primaryKey"`
-	StartTime time.Time  `gorm:"type:datetime;primaryKey"`
-	EndTime   *time.Time `gorm:"type:datetime"`
+	UserID    uuid.UUID  `gorm:"type:uuid;uniqueIndex:index_subs"`
+	StartDate time.Time  `gorm:"type:datetime;uniqueIndex:index_subs"`
+	EndDate   *time.Time `gorm:"type:datetime"`
 }
 
 type SubscriptionFilter struct {
 	Service   *string
 	Cost      *int32
-	UserID    *string
-	StartTime *time.Time
-	EndTime   *time.Time
+	UserID    *uuid.UUID
+	StartDate *time.Time
+	EndDate   *time.Time
 
 	Limit  *int
 	Offset *int
@@ -38,14 +40,14 @@ type SubscriptionsData struct {
 	SumCost       int64
 }
 
-// TODO время на хэндлере парсить
-
 type SubscriptionsRepo interface {
-	Create(Subscription) error
-	ReadByParams() error
-	Update(Subscription) error
-	Delete(Subscription) error
-	List() ([]Subscription, error)
+	Create(subscription *Subscription) (int64, error)
+	ReadByParams(filter *SubscriptionFilter) (*Subscription, error)
+	ReadByID(id int64) (*Subscription, error)
+	Update(subscriptionUpdated *Subscription) error
+	DeleteByID(id int64) error
+	List(filter *SubscriptionFilter) (*SubscriptionsData, error)
+	GetTotalCost(filter *SubscriptionFilter) (int64, error)
 }
 
 var (

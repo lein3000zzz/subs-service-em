@@ -2,7 +2,6 @@ package subs
 
 import (
 	"context"
-	"online-subs/pkg/utils"
 
 	"go.uber.org/zap"
 	"gorm.io/gorm"
@@ -21,16 +20,8 @@ func NewSubscriptionsPgRepo(logger *zap.SugaredLogger, db *gorm.DB) *Subscriptio
 	}
 }
 
-func (repo *SubscriptionsPgRepo) Create(subscription *Subscription) error {
+func (repo *SubscriptionsPgRepo) Create(subscription *Subscription) (int64, error) {
 	repo.logger.Debugw("create subscription", "subscription", subscription)
-
-	// TODO перенести в handler
-	id, err := utils.GenerateID()
-	if err != nil {
-		repo.logger.Errorw("error generating subscription id", "subscription", subscription, "error", err)
-		return err
-	}
-	subscription.ID = id
 
 	ctx, cancel := context.WithTimeout(context.Background(), SLATimeout)
 	defer cancel()
@@ -39,22 +30,23 @@ func (repo *SubscriptionsPgRepo) Create(subscription *Subscription) error {
 
 	if upsertRes.Error != nil {
 		repo.logger.Errorw("error upserting subscription", "error", upsertRes.Error, "subscription", subscription)
-		return upsertRes.Error
+		return 0, upsertRes.Error
 	}
 
 	if upsertRes.RowsAffected != 1 {
 		repo.logger.Warnw("failed upserting subscription", "error", ErrAlreadyExists, "subscription", subscription)
-		return ErrAlreadyExists
+		return 0, ErrAlreadyExists
 	}
 
 	repo.logger.Infow("subscription created", "subscription", subscription)
-	return nil
+	return *subscription.ID, nil
 }
 
 func (repo *SubscriptionsPgRepo) ReadByParams(filter *SubscriptionFilter) (*Subscription, error) {
 	repo.logger.Debugw("read subscription by params", "filter", filter)
 
-	if filter.Service == nil || filter.StartTime == nil || filter.UserID == nil {
+	// Вообще проверка происходит на хэндлере, но во избежание неправильного использования сделана доп. проверка здесь
+	if filter.Service == nil || filter.StartDate == nil || filter.UserID == nil {
 		repo.logger.Errorw("invalid filter", "filter", filter)
 		return nil, ErrWrongParams
 	}
@@ -64,7 +56,7 @@ func (repo *SubscriptionsPgRepo) ReadByParams(filter *SubscriptionFilter) (*Subs
 
 	var subscription Subscription
 	res := repo.db.WithContext(ctx).Where("service = ? AND start_time = ? AND user_id = ?",
-		filter.Service, filter.StartTime, filter.UserID).First(&subscription)
+		*filter.Service, *filter.StartDate, *filter.UserID).First(&subscription)
 
 	if res.Error != nil {
 		repo.logger.Errorw("error finding subscription by params", "error", res.Error, "filter", filter)
@@ -75,7 +67,7 @@ func (repo *SubscriptionsPgRepo) ReadByParams(filter *SubscriptionFilter) (*Subs
 	return &subscription, nil
 }
 
-func (repo *SubscriptionsPgRepo) FindByID(id string) (*Subscription, error) {
+func (repo *SubscriptionsPgRepo) ReadByID(id int64) (*Subscription, error) {
 	repo.logger.Debugw("read subscription by id", "id", id)
 
 	ctx, cancel := context.WithTimeout(context.Background(), SLATimeout)
@@ -115,7 +107,7 @@ func (repo *SubscriptionsPgRepo) Update(subscriptionUpdated *Subscription) error
 	return nil
 }
 
-func (repo *SubscriptionsPgRepo) Delete(id string) error {
+func (repo *SubscriptionsPgRepo) DeleteByID(id int64) error {
 	repo.logger.Debugw("delete subscription", "id", id)
 
 	ctx, cancel := context.WithTimeout(context.Background(), SLATimeout)
@@ -172,10 +164,12 @@ func (repo *SubscriptionsPgRepo) List(filter *SubscriptionFilter) (*Subscription
 		return nil, err
 	}
 
-	var order string
+	var sort string
 	if filter.Sort != nil {
-		order = repo.getSubsListOrder(*filter.Sort)
+		sort = *filter.Sort
 	}
+
+	order := repo.getSubsListOrder(sort)
 
 	query = query.Order(order)
 
@@ -201,23 +195,23 @@ func (repo *SubscriptionsPgRepo) filterQuery(query *gorm.DB, filter *Subscriptio
 	repo.logger.Debugw("filter subscriptions", "filter", filter)
 
 	if filter.Service != nil {
-		query = query.Where("service = ?", filter.Service)
+		query = query.Where("service = ?", *filter.Service)
 	}
 
-	if filter.StartTime != nil {
-		query = query.Where("start_time <= ?", filter.StartTime)
+	if filter.StartDate != nil {
+		query = query.Where("start_date <= ?", *filter.StartDate)
 	}
 
-	if filter.EndTime != nil {
-		query = query.Where("end_time >= ? OR end_time IS NULL", filter.EndTime)
+	if filter.EndDate != nil {
+		query = query.Where("end_date >= ? OR end_date IS NULL", *filter.EndDate)
 	}
 
 	if filter.UserID != nil {
-		query = query.Where("user_id = ?", filter.UserID)
+		query = query.Where("user_id = ?", *filter.UserID)
 	}
 
 	if filter.Cost != nil {
-		query = query.Where("cost = ?", filter.Cost)
+		query = query.Where("cost = ?", *filter.Cost)
 	}
 
 	return query
@@ -236,10 +230,10 @@ func (repo *SubscriptionsPgRepo) getSubsListOrder(sort string) string {
 		order = "service ASC"
 	case "service_desc":
 		order = "service DESC"
-	case "start_time":
-		order = "start_time ASC"
+	case "start_date":
+		order = "start_date ASC"
 	default:
-		order = "start_time DESC"
+		order = "start_date DESC"
 	}
 
 	return order
