@@ -2,6 +2,7 @@ package utils
 
 import (
 	"strconv"
+	"time"
 
 	"github.com/gin-gonic/gin"
 )
@@ -33,4 +34,31 @@ func CountPages(total, limit int64) int64 {
 		}
 	}
 	return pages
+}
+
+func GetOverlappedMonths(filterStart, filterEnd, actualStart time.Time, actualEnd *time.Time) int {
+	start := maxDate(filterStart, actualStart)
+	end := filterEnd
+
+	if actualEnd != nil {
+		subEnd := *actualEnd
+		if subEnd.Before(end) {
+			end = subEnd
+		}
+	}
+
+	if end.Before(start) {
+		return 0
+	}
+
+	y1, m1, _ := start.Date()
+	y2, m2, _ := end.Date()
+	return (y2-y1)*12 + int(m2-m1) + 1
+}
+
+func maxDate(a, b time.Time) time.Time {
+	if a.After(b) {
+		return a
+	}
+	return b
 }

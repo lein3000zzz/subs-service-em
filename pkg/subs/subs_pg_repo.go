@@ -2,6 +2,8 @@ package subs
 
 import (
 	"context"
+	"errors"
+	"online-subs/pkg/utils"
 
 	"go.uber.org/zap"
 	"gorm.io/gorm"
@@ -55,11 +57,14 @@ func (repo *SubscriptionsPgRepo) ReadByParams(filter *SubscriptionFilter) (*Subs
 	defer cancel()
 
 	var subscription Subscription
-	res := repo.db.WithContext(ctx).Where("service = ? AND start_time = ? AND user_id = ?",
+	res := repo.db.WithContext(ctx).Where("service = ? AND start_date = ? AND user_id = ?",
 		*filter.Service, *filter.StartDate, *filter.UserID).First(&subscription)
 
 	if res.Error != nil {
 		repo.logger.Errorw("error finding subscription by params", "error", res.Error, "filter", filter)
+		if errors.Is(res.Error, gorm.ErrRecordNotFound) {
+			return nil, ErrNotFound
+		}
 		return nil, res.Error
 	}
 
@@ -78,6 +83,9 @@ func (repo *SubscriptionsPgRepo) ReadByID(id int64) (*Subscription, error) {
 
 	if res.Error != nil {
 		repo.logger.Errorw("error finding subscription by id", "id", id, "error", res.Error)
+		if errors.Is(res.Error, gorm.ErrRecordNotFound) {
+			return nil, ErrNotFound
+		}
 		return nil, res.Error
 	}
 
@@ -85,16 +93,19 @@ func (repo *SubscriptionsPgRepo) ReadByID(id int64) (*Subscription, error) {
 	return &subscription, nil
 }
 
-func (repo *SubscriptionsPgRepo) Update(subscriptionUpdated *Subscription) error {
+func (repo *SubscriptionsPgRepo) Update(id int64, subscriptionUpdated *Subscription) error {
 	repo.logger.Debugw("update subscription", "subscription", subscriptionUpdated)
 
 	ctx, cancel := context.WithTimeout(context.Background(), SLATimeout)
 	defer cancel()
 
-	res := repo.db.WithContext(ctx).Model(&Subscription{}).Where("id = ?", subscriptionUpdated.ID).Updates(subscriptionUpdated)
+	res := repo.db.WithContext(ctx).Model(&Subscription{}).Where("id = ?", id).Updates(subscriptionUpdated)
 
 	if res.Error != nil {
 		repo.logger.Errorw("error updating subscription", "error", res.Error, "subscription", subscriptionUpdated)
+		if errors.Is(res.Error, gorm.ErrRecordNotFound) {
+			return ErrNotFound
+		}
 		return res.Error
 	}
 
@@ -117,6 +128,9 @@ func (repo *SubscriptionsPgRepo) DeleteByID(id int64) error {
 
 	if res.Error != nil {
 		repo.logger.Errorw("error deleting subscription", "id", id, "error", res.Error)
+		if errors.Is(res.Error, gorm.ErrRecordNotFound) {
+			return ErrNotFound
+		}
 		return res.Error
 	}
 
@@ -154,14 +168,7 @@ func (repo *SubscriptionsPgRepo) List(filter *SubscriptionFilter) (*Subscription
 		return &SubscriptionsData{
 			Subscriptions: []*Subscription{},
 			Total:         0,
-			SumCost:       0,
 		}, nil
-	}
-
-	var sumCost int64
-	if err := query.Select("SUM(cost)").Scan(&sumCost).Error; err != nil {
-		repo.logger.Warnw("failed to sum costs with filter", "err", err, "filter", filter)
-		return nil, err
 	}
 
 	var sort string
@@ -187,7 +194,6 @@ func (repo *SubscriptionsPgRepo) List(filter *SubscriptionFilter) (*Subscription
 	return &SubscriptionsData{
 		Subscriptions: subscriptions,
 		Total:         total,
-		SumCost:       sumCost,
 	}, nil
 }
 
@@ -198,20 +204,23 @@ func (repo *SubscriptionsPgRepo) filterQuery(query *gorm.DB, filter *Subscriptio
 		query = query.Where("service = ?", *filter.Service)
 	}
 
-	if filter.StartDate != nil {
-		query = query.Where("start_date <= ?", *filter.StartDate)
-	}
-
-	if filter.EndDate != nil {
-		query = query.Where("end_date >= ? OR end_date IS NULL", *filter.EndDate)
-	}
-
 	if filter.UserID != nil {
 		query = query.Where("user_id = ?", *filter.UserID)
 	}
 
 	if filter.Cost != nil {
 		query = query.Where("cost = ?", *filter.Cost)
+	}
+
+	if filter.StartDate != nil && filter.EndDate != nil {
+		query = query.Where("start_date <= ?", *filter.EndDate).
+			Where("(end_date IS NULL OR end_date >= ?)", *filter.StartDate)
+	} else if filter.StartDate != nil {
+		query = query.Where("start_date <= ?", *filter.StartDate).
+			Where("(end_date IS NULL OR end_date >= ?)", *filter.StartDate)
+	} else if filter.EndDate != nil {
+		query = query.Where("start_date <= ?", *filter.EndDate).
+			Where("(end_date IS NULL OR end_date >= ?)", *filter.EndDate)
 	}
 
 	return query
@@ -255,22 +264,31 @@ func (repo *SubscriptionsPgRepo) setLimitAndOffset(query *gorm.DB, limit, offset
 func (repo *SubscriptionsPgRepo) GetTotalCost(filter *SubscriptionFilter) (int64, error) {
 	repo.logger.Debugw("get total cost of subscriptions", "filter", filter)
 
+	// Это проверяется, но, опять же, во избежание неправильного использования решил оставить
+	if filter.StartDate == nil || filter.EndDate == nil {
+		repo.logger.Errorw("start date and end date are nil", "filter", filter)
+		return 0, ErrWrongParams
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), SLATimeout)
 	defer cancel()
 
+	var subs []*Subscription
+
 	query := repo.db.WithContext(ctx).Model(&Subscription{})
-
-	if query.Error != nil {
-		repo.logger.Errorw("error getting total cost", "error", query.Error, "filter", filter)
-		return 0, query.Error
-	}
-
 	query = repo.filterQuery(query, filter)
 
-	var sumCost int64
-	if err := query.Select("SUM(cost)").Scan(&sumCost).Error; err != nil {
-		repo.logger.Warnw("failed to sum costs with filter", "err", err, "filter", filter)
+	if err := query.Find(&subs).Error; err != nil {
+		repo.logger.Errorw("error getting total cost", "filter", filter, "error", err)
 		return 0, err
+	}
+
+	var sumCost int64
+	for _, sub := range subs {
+		months := utils.GetOverlappedMonths(*filter.StartDate, *filter.EndDate, sub.StartDate, sub.EndDate)
+		if months > 0 {
+			sumCost += int64(months) * int64(sub.Cost)
+		}
 	}
 
 	repo.logger.Infow("total cost calculated", "sumCost", sumCost, "filter", filter)

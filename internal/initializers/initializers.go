@@ -3,6 +3,7 @@ package initializers
 import (
 	"log"
 	"online-subs/pkg/handlers"
+	"online-subs/pkg/subs"
 	"os"
 
 	"github.com/gin-gonic/gin"
@@ -53,9 +54,18 @@ func initSubsRouter(handler *handlers.SubsHandler) *gin.Engine {
 	subsGroup.GET("/total", handler.GetTotalCost())
 
 	subsGroup.POST("/create", handler.CreateSub())
-	subsGroup.PATCH("/update", handler.UpdateSub())
+	subsGroup.PATCH("/update/:id", handler.UpdateSub())
 
 	subsGroup.DELETE("/delete/:id", handler.DeleteSub())
 
 	return r
+}
+
+func gormAutoMigrate(db *gorm.DB) {
+	if errAuto := db.AutoMigrate(
+		&subs.Subscription{},
+	); errAuto != nil {
+		log.Fatalf("AutoMigrate failed: %v", errAuto)
+		return
+	}
 }

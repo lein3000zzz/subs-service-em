@@ -18,8 +18,8 @@ type Subscription struct {
 	Service   string     `gorm:"type:varchar(255);uniqueIndex:index_subs"`
 	Cost      int32      `gorm:"type:int;not null"`
 	UserID    uuid.UUID  `gorm:"type:uuid;uniqueIndex:index_subs"`
-	StartDate time.Time  `gorm:"type:datetime;uniqueIndex:index_subs"`
-	EndDate   *time.Time `gorm:"type:datetime"`
+	StartDate time.Time  `gorm:"type:date;uniqueIndex:index_subs"`
+	EndDate   *time.Time `gorm:"type:date"`
 }
 
 type SubscriptionFilter struct {
@@ -37,14 +37,13 @@ type SubscriptionFilter struct {
 type SubscriptionsData struct {
 	Subscriptions []*Subscription
 	Total         int64
-	SumCost       int64
 }
 
 type SubscriptionsRepo interface {
 	Create(subscription *Subscription) (int64, error)
 	ReadByParams(filter *SubscriptionFilter) (*Subscription, error)
 	ReadByID(id int64) (*Subscription, error)
-	Update(subscriptionUpdated *Subscription) error
+	Update(id int64, subscriptionUpdated *Subscription) error
 	DeleteByID(id int64) error
 	List(filter *SubscriptionFilter) (*SubscriptionsData, error)
 	GetTotalCost(filter *SubscriptionFilter) (int64, error)

@@ -193,6 +193,16 @@ func (h *SubsHandler) UpdateSub() func(c *gin.Context) {
 		var request updateRequest
 		responseJSON := gin.H{}
 
+		idStr := c.Param("id")
+		id, err := strconv.ParseInt(idStr, 10, 64)
+		if err != nil {
+			h.logger.Errorw("Failed to parse id", "error", err)
+			responseJSON["error"] = ErrInvalidParam
+
+			c.JSON(http.StatusBadRequest, responseJSON)
+			return
+		}
+
 		if err := c.ShouldBindJSON(&request); err != nil {
 			h.logger.Errorw("Failed to bind JSON", "error", err)
 			responseJSON["error"] = "Invalid request"
@@ -232,13 +242,13 @@ func (h *SubsHandler) UpdateSub() func(c *gin.Context) {
 			ID:        &request.ID,
 		}
 
-		err = h.subsRepo.Update(&updatedSub)
+		err = h.subsRepo.Update(id, &updatedSub)
 		if err != nil {
 			h.logger.Errorw("Failed to update subscription", "error", err)
 
 			if errors.Is(err, subs.ErrNotFound) {
 				responseJSON["error"] = "Subscription not found"
-				c.JSON(http.StatusBadRequest, responseJSON)
+				c.JSON(http.StatusNotFound, responseJSON)
 			} else {
 				responseJSON["error"] = "Failed to update subscription"
 				c.JSON(http.StatusInternalServerError, responseJSON)
@@ -348,6 +358,14 @@ func (h *SubsHandler) GetTotalCost() func(c *gin.Context) {
 		if err != nil {
 			h.logger.Errorw("Failed to construct filter from context query", "error", err)
 			responseJSON["error"] = err.Error()
+
+			c.JSON(http.StatusBadRequest, responseJSON)
+			return
+		}
+
+		if filter.StartDate == nil || filter.EndDate == nil {
+			h.logger.Errorw(ErrDateFormat.Error(), "error", err)
+			responseJSON["error"] = ErrDateFormat.Error()
 
 			c.JSON(http.StatusBadRequest, responseJSON)
 			return
