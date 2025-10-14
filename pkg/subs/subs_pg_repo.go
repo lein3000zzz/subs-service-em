@@ -28,7 +28,7 @@ func (repo *SubscriptionsPgRepo) Create(subscription *Subscription) (int64, erro
 	ctx, cancel := context.WithTimeout(context.Background(), SLATimeout)
 	defer cancel()
 
-	upsertRes := repo.db.WithContext(ctx).Clauses(clause.OnConflict{DoNothing: true}).Create(subscription)
+	upsertRes := repo.db.WithContext(ctx).Clauses(clause.OnConflict{DoNothing: true}).Omit("end_date").Create(subscription)
 
 	if upsertRes.Error != nil {
 		repo.logger.Errorw("error upserting subscription", "error", upsertRes.Error, "subscription", subscription)
@@ -99,7 +99,7 @@ func (repo *SubscriptionsPgRepo) Update(id int64, subscriptionUpdated *Subscript
 	ctx, cancel := context.WithTimeout(context.Background(), SLATimeout)
 	defer cancel()
 
-	res := repo.db.WithContext(ctx).Model(&Subscription{}).Where("id = ?", id).Updates(subscriptionUpdated)
+	res := repo.db.WithContext(ctx).Model(&Subscription{}).Where("id = ?", id).Omit("id").Updates(subscriptionUpdated)
 
 	if res.Error != nil {
 		repo.logger.Errorw("error updating subscription", "error", res.Error, "subscription", subscriptionUpdated)

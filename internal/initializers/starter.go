@@ -4,6 +4,7 @@ import (
 	"log"
 	"online-subs/pkg/handlers"
 	"online-subs/pkg/subs"
+	"os"
 
 	"go.uber.org/zap"
 )
@@ -28,5 +29,5 @@ func RunSubsService() {
 
 	r := initSubsRouter(subsHandler)
 
-	logger.Fatal(r.Run(":8080"))
+	logger.Fatal(r.Run(":" + os.Getenv("PORT")))
 }

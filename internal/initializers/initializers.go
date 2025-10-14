@@ -2,19 +2,27 @@ package initializers
 
 import (
 	"log"
+	"online-subs/docs"
 	"online-subs/pkg/handlers"
 	"online-subs/pkg/subs"
 	"os"
 
 	"github.com/gin-gonic/gin"
+
 	"github.com/joho/godotenv"
+	swaggerfiles "github.com/swaggo/files"
+	ginswagger "github.com/swaggo/gin-swagger"
 	"go.uber.org/zap"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
 
 func startGetEnv() {
-	err := godotenv.Load(".env")
+	if os.Getenv("ENVIRONMENT") != "LOCAL" {
+		return
+	}
+
+	err := godotenv.Load("local.env")
 
 	if err != nil {
 		log.Fatalf("Error loading .env file")
@@ -44,19 +52,22 @@ func startPostgres() *gorm.DB {
 
 func initSubsRouter(handler *handlers.SubsHandler) *gin.Engine {
 	r := gin.Default()
-	r.Use(gin.Recovery())
 
-	subsGroup := r.Group("/subscriptions")
+	host := "localhost:" + os.Getenv("PORT")
+	docs.SwaggerInfo.Host = host
+	r.GET("/swagger/*any", ginswagger.WrapHandler(swaggerfiles.Handler))
 
-	subsGroup.GET("/get/query", handler.GetByParams())
-	subsGroup.GET("/get/:id", handler.GetSubByID())
-	subsGroup.GET("/list", handler.List())
-	subsGroup.GET("/total", handler.GetTotalCost())
+	subsGroup := r.Group("/subscriptions/v1")
 
-	subsGroup.POST("/create", handler.CreateSub())
-	subsGroup.PATCH("/update/:id", handler.UpdateSub())
+	subsGroup.GET("/get/query", handler.GetByParams)
+	subsGroup.GET("/get/:id", handler.GetSubByID)
+	subsGroup.GET("/list", handler.List)
+	subsGroup.GET("/total", handler.GetTotalCost)
 
-	subsGroup.DELETE("/delete/:id", handler.DeleteSub())
+	subsGroup.POST("/create", handler.CreateSub)
+	subsGroup.PATCH("/update/:id", handler.UpdateSub)
+
+	subsGroup.DELETE("/delete/:id", handler.DeleteSub)
 
 	return r
 }
