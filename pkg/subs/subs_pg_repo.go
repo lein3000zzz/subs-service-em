@@ -55,7 +55,7 @@ func (repo *SubscriptionsPgRepo) Create(subscription *Subscription) (string, err
 func (repo *SubscriptionsPgRepo) ReadByParams(filter *SubscriptionFilter) (*Subscription, error) {
 	repo.logger.Debugw("read subscription by params", "filter", filter)
 
-	// Вообще проверка происходит на хэндлере, но во избежание неправильного использования сделана доп. проверка здесь
+	// Вообще проверка происходит на хэндлере, но во избежание неправильного использования сделана доп. проверка здесь, хотя логичнее держать чисто в хендлере
 	if filter.Service == nil || filter.StartDate == nil || filter.UserID == nil {
 		repo.logger.Errorw("invalid filter", "filter", filter)
 		return nil, ErrWrongParams
@@ -198,7 +198,7 @@ func (repo *SubscriptionsPgRepo) List(filter *SubscriptionFilter) (*Subscription
 		return nil, err
 	}
 
-	repo.logger.Infow("subscriptions found with filter", "subscriptions", subscriptions, "filter", filter)
+	repo.logger.Infow("subscriptions found with filter", "filter", filter)
 	return &SubscriptionsData{
 		Subscriptions: subscriptions,
 		Total:         total,
@@ -272,7 +272,7 @@ func (repo *SubscriptionsPgRepo) setLimitAndOffset(query *gorm.DB, limit, offset
 func (repo *SubscriptionsPgRepo) GetTotalCost(filter *SubscriptionFilter) (int64, error) {
 	repo.logger.Debugw("get total cost of subscriptions", "filter", filter)
 
-	// Это проверяется, но, опять же, во избежание неправильного использования решил оставить
+	// Это проверяется, но, опять же, во избежание неправильного использования решил оставить, хотя логичнее держать чисто в хендлере
 	if filter.StartDate == nil || filter.EndDate == nil {
 		repo.logger.Errorw("start date and end date are nil", "filter", filter)
 		return 0, ErrWrongParams

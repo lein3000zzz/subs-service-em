@@ -47,10 +47,12 @@ type basicRequest struct {
 type ErrorResponse struct {
 	Error string `json:"error"`
 }
+
 type SubscriptionResponse struct {
 	Message      string             `json:"message"`
 	Subscription *subs.Subscription `json:"subscription"`
 }
+
 type BasicResponse struct {
 	Message string `json:"message"`
 	ID      string `json:"id"`
@@ -87,7 +89,7 @@ type CostResponse struct {
 func (h *SubsHandler) CreateSub(c *gin.Context) {
 	h.logger.Debugw("handling CreateSub()")
 
-	newSub, err := h.buildSubscription(c)
+	newSub, err := h.buildSubscriptionFromContext(c)
 
 	if err != nil {
 		h.logger.Errorw("error creating new sub", "error", err)
@@ -123,6 +125,42 @@ func (h *SubsHandler) CreateSub(c *gin.Context) {
 	})
 }
 
+func (h *SubsHandler) buildSubscriptionFromContext(c *gin.Context) (*subs.Subscription, error) {
+	var request basicRequest
+
+	if err := c.ShouldBindJSON(&request); err != nil {
+		h.logger.Errorw("Failed to bind JSON", "error", err)
+
+		return nil, err
+	}
+
+	startDate, err := time.Parse(subs.TimeParseFormat, request.StartDate)
+	if err != nil {
+		h.logger.Errorw(ErrDateFormat.Error(), "error", err)
+
+		return nil, ErrDateFormat
+	}
+
+	var endDate *time.Time
+	if request.EndDate != nil {
+		endDateVal, err := time.Parse(subs.TimeParseFormat, *request.EndDate)
+		if err != nil {
+			h.logger.Errorw("Invalid end date format", "error", err)
+
+			return nil, ErrDateFormat
+		}
+		endDate = &endDateVal
+	}
+
+	return &subs.Subscription{
+		Service:   request.ServiceName,
+		Cost:      request.Cost,
+		UserID:    request.UserID,
+		StartDate: startDate,
+		EndDate:   endDate,
+	}, nil
+}
+
 // GetSubByID godoc
 // @Summary Get subscription by ID
 // @Tags subscriptions
@@ -143,42 +181,6 @@ func (h *SubsHandler) GetSubByID(c *gin.Context) {
 	h.handleGetSubscriptionResponse(c, subscription, err)
 }
 
-func (h *SubsHandler) buildSubscription(c *gin.Context) (*subs.Subscription, error) {
-	var request basicRequest
-
-	if err := c.ShouldBindJSON(&request); err != nil {
-		h.logger.Errorw("Failed to bind JSON", "error", err)
-
-		return nil, err
-	}
-
-	startDate, err := time.Parse(subs.TimeParseFormat, request.StartDate)
-	if err != nil {
-		h.logger.Errorw(ErrDateFormat.Error(), "error", err)
-
-		return nil, ErrDateFormat
-	}
-
-	var endDate *time.Time
-	if request.EndDate != nil {
-		endDateVal, err := time.Parse(subs.TimeParseFormat, *request.EndDate)
-		endDate = &endDateVal
-		if err != nil {
-			h.logger.Errorw("Invalid end date format", "error", err)
-
-			return nil, ErrDateFormat
-		}
-	}
-
-	return &subs.Subscription{
-		Service:   request.ServiceName,
-		Cost:      request.Cost,
-		UserID:    request.UserID,
-		StartDate: startDate,
-		EndDate:   endDate,
-	}, nil
-}
-
 // GetByParams godoc
 // @Summary Get subscription by unique params
 // @Tags subscriptions
@@ -194,22 +196,22 @@ func (h *SubsHandler) buildSubscription(c *gin.Context) (*subs.Subscription, err
 func (h *SubsHandler) GetByParams(c *gin.Context) {
 	h.logger.Debugw("handling GetByParams()")
 
-	responseJSON := gin.H{}
-
 	filter, err := h.constructFilterFromContextQuery(c)
 	if err != nil {
 		h.logger.Errorw("Failed to construct filter from context query", "error", err)
-		responseJSON["error"] = err.Error()
 
-		c.JSON(http.StatusBadRequest, responseJSON)
+		c.JSON(http.StatusBadRequest, ErrorResponse{
+			Error: err.Error(),
+		})
 		return
 	}
 
 	if filter.Service == nil || filter.UserID == nil || filter.StartDate == nil {
 		h.logger.Errorw("Insufficient filter params for a unique instance", "error", ErrInvalidParam)
-		responseJSON["error"] = ErrInvalidParam.Error()
 
-		c.JSON(http.StatusBadRequest, responseJSON)
+		c.JSON(http.StatusBadRequest, ErrorResponse{
+			Error: ErrInvalidParam.Error(),
+		})
 		return
 	}
 
@@ -255,52 +257,20 @@ func (h *SubsHandler) handleGetSubscriptionResponse(c *gin.Context, subscription
 func (h *SubsHandler) UpdateSub(c *gin.Context) {
 	h.logger.Debugw("handling UpdateSub()")
 
-	var request basicRequest
-
 	id := c.Param("id")
 
-	if err := c.ShouldBindJSON(&request); err != nil {
-		h.logger.Errorw("Failed to bind JSON", "error", err)
+	subUpdates, err := h.buildSubscriptionFromContext(c)
 
-		c.JSON(http.StatusBadRequest, ErrorResponse{
-			Error: ErrInvalidParam.Error(),
-		})
-		return
-	}
-
-	startDate, err := time.Parse(subs.TimeParseFormat, request.StartDate)
 	if err != nil {
-		h.logger.Errorw(ErrDateFormat.Error(), "error", err)
+		h.logger.Errorw("error creating new sub", "error", err)
 
 		c.JSON(http.StatusBadRequest, ErrorResponse{
-			Error: ErrDateFormat.Error(),
+			Error: err.Error(),
 		})
 		return
 	}
 
-	var endDate *time.Time
-	if request.EndDate != nil {
-		endDateVal, err := time.Parse(subs.TimeParseFormat, *request.EndDate)
-		if err != nil {
-			h.logger.Errorw(ErrDateFormat.Error(), "error", err)
-
-			c.JSON(http.StatusBadRequest, ErrorResponse{
-				Error: ErrDateFormat.Error(),
-			})
-			return
-		}
-		endDate = &endDateVal
-	}
-
-	updatedSub := subs.Subscription{
-		Service:   request.ServiceName,
-		Cost:      request.Cost,
-		UserID:    request.UserID,
-		StartDate: startDate,
-		EndDate:   endDate,
-	}
-
-	err = h.subsRepo.Update(id, &updatedSub)
+	err = h.subsRepo.Update(id, subUpdates)
 	if err != nil {
 		h.logger.Errorw("Failed to update subscription", "error", err)
 
@@ -317,7 +287,7 @@ func (h *SubsHandler) UpdateSub(c *gin.Context) {
 		return
 	}
 
-	h.logger.Infow("Successfully updated subscription", "id", updatedSub.ID)
+	h.logger.Infow("Successfully updated subscription", "id", subUpdates.ID)
 
 	c.JSON(http.StatusOK, BasicResponse{
 		Message: messageSuccess,
