@@ -19,7 +19,7 @@ go mod download
 2. Fill `local.env` with your own data
 3. Use the provided migration file
 4. `go run cmd/subs/main.go`
-5. The API will be available at <localhost:8080/> or the port specified.
+5. The API will be available at <http://localhost:8080/> or the port specified.
 6. Docs generation is not automatic without docker - use `swag init -g cmd/subs/main.go -o docs` or see [gin-swagger](https://github.com/swaggo/gin-swagger) for more 
 ### Running with Docker
 1. Ensure Docker and Docker Compose are installed.
