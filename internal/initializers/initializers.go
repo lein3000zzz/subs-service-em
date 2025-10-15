@@ -18,7 +18,7 @@ import (
 )
 
 func startGetEnv() {
-	if os.Getenv("ENVIRONMENT") != "LOCAL" {
+	if os.Getenv("ENVIRONMENT") == "PROD" {
 		return
 	}
 
